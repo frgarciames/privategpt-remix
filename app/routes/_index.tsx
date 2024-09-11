@@ -1,48 +1,55 @@
+import {Outlet, useLocation, useNavigate} from '@remix-run/react'
+
 import type { MetaFunction } from "@remix-run/node";
+import { checkIsPgptHealthy } from "@/lib/pgpt.client";
+import { useEffect } from "react";
+import { useLocalStorage } from "usehooks-ts";
 
 export const meta: MetaFunction = () => {
-  return [
-    { title: "New Remix App" },
-    { name: "description", content: "Welcome to Remix!" },
-  ];
+	return [
+		{ title: "New Remix App" },
+		{ name: "description", content: "Welcome to Remix!" },
+	];
 };
 
+
 export default function Index() {
-  return (
-    <div className="font-sans p-4">
-      <h1 className="text-3xl">Welcome to Remix</h1>
-      <ul className="list-disc mt-4 pl-6 space-y-2">
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/start/quickstart"
-            rel="noreferrer"
-          >
-            5m Quick Start
-          </a>
-        </li>
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/start/tutorial"
-            rel="noreferrer"
-          >
-            30m Tutorial
-          </a>
-        </li>
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/docs"
-            rel="noreferrer"
-          >
-            Remix Docs
-          </a>
-        </li>
-      </ul>
-    </div>
-  );
-}
+	const navigate = useNavigate();
+	const { pathname } = useLocation();
+	const [environment, setEnvironment, deleteEnvironment] = useLocalStorage<
+		string | undefined
+	>("pgpt-url", undefined);
+
+	const checkPrivateGptHealth = async (env: string) => {
+		try {
+			const isHealthy = await checkIsPgptHealthy(env);
+			if (!isHealthy) {
+				alert("The Private GPT instance is not healthy");
+				return deleteEnvironment();
+			}
+			if (pathname === "/") {
+				navigate("/chat");
+			}
+		} catch {
+			alert("The Private GPT instance is not healthy");
+			deleteEnvironment();
+		}
+	};
+
+	useEffect(() => {
+		if (!environment) {
+			const url = prompt(
+				"Please enter the URL of your Private GPT instance",
+				"http://localhost:8001",
+			);
+			if (!url) return;
+			setEnvironment(url);
+			checkPrivateGptHealth(url);
+		} else {
+			checkPrivateGptHealth(environment);
+		}
+	}, [environment]);
+
+	if (environment) return <Outlet />;
+	return <div>Loading...</div>;
+};
